@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mundial 2026 — Clasificación Final</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0b1120;
+    --surface: #131e30;
+    --card: #1a2640;
+    --border: #243352;
+    --green: #22c55e;
+    --green-dim: #166534;
+    --gold: #f59e0b;
+    --silver: #94a3b8;
+    --bronze: #b45309;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #3b82f6;
+    --elim: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #0b1120 0%, #162032 50%, #0b1120 100%);
+    border-bottom: 2px solid var(--green);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    width: 48px; height: 48px;
+    background: var(--green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: #000;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+
+  header h1 span { color: var(--green); }
+
+  .nav-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    padding: 6px;
+    border-radius: 10px;
+    margin: 0 32px 0 auto;
+  }
+
+  .nav-tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .nav-tab.active {
+    background: var(--green);
+    color: #000;
+  }
+
+  .export-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 22px;
+    background: var(--gold);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+
+  .export-btn:hover { opacity: 0.85; }
+
+  .page { display: none; padding: 32px; }
+  .page.active { display: block; }
+
+  /* ── FASE DE GRUPOS ── */
+  .groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .group-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .group-header {
+    background: var(--surface);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .group-letter {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: var(--green);
+    width: 28px;
+  }
+
+  .group-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .group-teams { padding: 8px; }
+
+  .team-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: grab;
+    transition: background 0.15s;
+    user-select: none;
+  }
+
+  .team-row:hover { background: var(--surface); }
+  .team-row.dragging { opacity: 0.4; }
+  .team-row.drag-over { background: rgba(34,197,94,0.12); border: 1px dashed var(--green); }
+
+  .pos-badge {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .pos-1 { background: var(--gold); color: #000; }
+  .pos-2 { background: var(--silver); color: #000; }
+  .pos-3 { background: #78350f; color: #fbbf24; border: 1px solid var(--bronze); }
+  .pos-4 { background: var(--elim); color: #fff; }
+
+  .team-flag { font-size: 18px; }
+
+  .team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+  }
+
+  .drag-handle {
+    color: var(--muted);
+    font-size: 12px;
+    opacity: 0.4;
+  }
+
+  /* Mejores terceros */
+  .thirds-section {
+    margin-top: 28px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .thirds-header {
+    background: var(--surface);
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .thirds-header h3 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .thirds-note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .thirds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    padding: 16px;
+  }
+
+  .third-team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .third-team.selected {
+    background: rgba(34,197,94,0.1);
+    border-color: var(--green);
+  }
+
+  .third-team.selected .third-check { color: var(--green); }
+
+  .third-check {
+    font-size: 14px;
+    color: var(--muted);
+    width: 16px;
+  }
+
+  .third-team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .thirds-counter {
+    display: inline-block;
+    background: var(--green);
+    color: #000;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+
+  .thirds-counter.warning {
+    background: var(--elim);
+    color: #fff;
+  }
+
+  /* ── FASE ELIMINATORIA ── */
+  .bracket-container {
+    overflow-x: auto;
+    padding-bottom: 20px;
+  }
+
+  .bracket {
+    display: flex;
+    gap: 0;
+    min-width: 1100px;
+  }
+
+  .bracket-round {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 160px;
+  }
+
+  .round-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--green);
+    text-align: center;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--green-dim);
+    margin-bottom: 8px;
+  }
+
+  .round-matches {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    flex: 1;
+    gap: 8px;
+    padding: 4px 4px;
+  }
+
+  .match {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .match:hover { border-color: var(--accent); }
+
+  .match-team {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    min-height: 32px;
+  }
+
+  .match-team:first-child { border-bottom: 1px solid var(--border); }
+
+  .match-team:hover { background: rgba(59,130,246,0.08); }
+
+  .match-team.winner {
+    background: rgba(34,197,94,0.12);
+    color: var(--green);
+  }
+
+  .match-team.loser { opacity: 0.45; }
+
+  .match-team .flag { font-size: 14px; }
+
+  .match-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-align: center;
+    padding: 2px 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tbd {
+    color: var(--muted);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  /* ── CLASIFICACIÓN ── */
+  .ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ranking-table th {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+  }
+
+  .ranking-table td {
+    padding: 9px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .ranking-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .rank-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--muted);
+    width: 40px;
+  }
+
+  .rank-1 .rank-num { color: var(--gold); }
+  .rank-2 .rank-num { color: var(--silver); }
+  .rank-3 .rank-num { color: var(--bronze); }
+
+  .stage-badge {
+    display: inline-block;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .stage-winner { background: var(--gold); color: #000; }
+  .stage-final { background: var(--silver); color: #000; }
+  .stage-semi { background: #374151; color: var(--text); }
+  .stage-quarter { background: #1e293b; color: var(--text); }
+  .stage-r16 { background: #0f172a; color: var(--muted); border: 1px solid var(--border); }
+  .stage-groups { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+  .info-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 8px 0 24px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">26</div>
+  <h1>Mundial <span>2026</span></h1>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('groups')">Grupos</button>
+    <button class="nav-tab" onclick="showPage('bracket')">Eliminatorias</button>
+    <button class="nav-tab" onclick="showPage('ranking')">Clasificación</button>
+  </nav>
+  <button class="export-btn" onclick="exportExcel()">⬇ Exportar Excel</button>
+</header>
+
+<div id="page-groups" class="page active">
+  <div class="info-banner">
+    Arrastrá los equipos dentro de cada grupo para ordenarlos. La posición 1° y 2° clasifican directo. Los mejores 8 terceros también clasifican — seleccionalos abajo.</div>
+  <div id="groups-grid" class="groups-grid"></div>
+  <div class="thirds-section">
+    <div class="thirds-header">
+      <h3>Mejores Terceros</h3>
+      <span id="thirds-counter" class="thirds-counter warning">0 / 8</span>
+      <span class="thirds-note">Seleccioná exactamente 8 de los 12 terceros</span>
+    </div>
+    <div id="thirds-grid" class="thirds-grid"></div>
+  </div>
+</div>
+
+<div id="page-bracket" class="page">
+  <div class="info-banner">
+    Hacé clic en un equipo para marcarlo como ganador del partido. Los ganadores avanzan automáticamente a la siguiente ronda.</div>
+  <div class="progress-bar"><div class="progress-fill" id="bracket-progress" style="width:0%"></div></div>
+  <div class="bracket-container">
+    <div class="bracket" id="bracket"></div>
+  </div>
+</div>
+
+<div id="page-ranking" class="page">
+  <div class="info-banner">
+    Clasificación de los 48 equipos según hasta dónde llegaron. Los empates dentro de la misma fase se ordenan por posición en grupo y por grupo.</div>
+  <table class="ranking-table" id="ranking-table">
+    <thead>
+      <tr>
+        <th>Pos</th>
+        <th>Equipo</th>
+        <th>Grupo</th>
+        <th>Fase alcanzada</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const GROUPS_DATA = {
+  A: ["🇲🇽 México","🇿🇦 Sudáfrica","🇰🇷 Corea del Sur","🇨🇿 Rep. Checa"],
+  B: ["🇨🇦 Canadá","🇧🇦 Bosnia y Herzeg.","🇶🇦 Catar","🇨🇭 Suiza"],
+  C: ["🇧🇷 Brasil","🇲🇦 Marruecos","🇭🇹 Haití","🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia"],
+  D: ["🇺🇸 Estados Unidos","🇵🇾 Paraguay","🇦🇺 Australia","🇹🇷 Turquía"],
+  E: ["🇩🇪 Alemania","🇨🇼 Curazao","🇨🇮 Costa de Marfil","🇪🇨 Ecuador"],
+  F: ["🇳🇱 Países Bajos","🇯🇵 Japón","🇸🇪 Suecia","🇹🇳 Túnez"],
+  G: ["🇧🇪 Bélgica","🇪🇬 Egipto","🇮🇷 Irán","🇳🇿 Nueva Zelanda"],
+  H: ["🇪🇸 España","🇨🇻 Cabo Verde","🇸🇦 Arabia Saudita","🇺🇾 Uruguay"],
+  I: ["🇫🇷 Francia","🇸🇳 Senegal","🇮🇶 Irak","🇳🇴 Noruega"],
+  J: ["🇦🇷 Argentina","🇩🇿 Argelia","🇦🇹 Austria","🇯🇴 Jordania"],
+  K: ["🇵🇹 Portugal","🇨🇬 Rep. del Congo","🇺🇿 Uzbekistán","🇨🇴 Colombia"],
+  L: ["🏴󠁧󠁢󠁥󠁮󠁧󠁿 Inglaterra","🇭🇷 Croacia","🇬🇭 Ghana","🇵🇦 Panamá"]
+};
+
+// State
+let groups = {};      // { A: ["team1","team2","team3","team4"], ... }
+let thirds = new Set();  // selected best thirds (team names)
+let matches = {};     // matchId -> {t1, t2, winner}
+let advancers = {};   // matchId -> winner team name
+
+// ─── INIT GROUPS ────────────────────────────────────────────────────────────
+function initGroups() {
+  for (const [letter, teams] of Object.entries(GROUPS_DATA)) {
+    groups[letter] = [...teams];
+  }
+  renderGroups();
+}
+
+function getTeamName(full) {
+  return full.replace(/[\u{1F1E0}-\u{1F1FF}\u{1F3F4}\uDB40\uDC00-\uDB40\uDCFF]/gu,'').replace(/[\u{FE0F}]/gu,'').trim();
+}
+
+function renderGroups() {
+  const grid = document.getElementById('groups-grid');
+  grid.innerHTML = '';
+  for (const [letter, teams] of Object.entries(groups)) {
+    const card = document.createElement('div');
+    card.className = 'group-card';
+    card.innerHTML = `
+      <div class="group-header">
+        <span class="group-letter">${letter}</span>
+        <span class="group-title">Grupo ${letter}</span>
+      </div>
+      <div class="group-teams" id="group-${letter}">
+        ${teams.map((t,i) => teamRow(t, i+1, letter)).join('')}
+      </div>`;
+    grid.appendChild(card);
+  }
+  setupDragDrop();
+  renderThirds();
+}
+
+function teamRow(team, pos, group) {
+  const flag = [...team][0];
+  const name = getTeamName(team);
+  return `<div class="team-row" draggable="true" data-team="${team}" data-group="${group}">
+    <span class="pos-badge pos-${pos}">${pos}</span>
+    <span class="team-flag">${flag}</span>
+    <span class="team-name">${name}</span>
+    <span class="drag-handle">⠿</span>
+  </div>`;
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────────────────────────
+let dragSrc = null;
+
+function setupDragDrop() {
+  document.querySelectorAll('.team-row').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragSrc = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('.team-row').forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (row !== dragSrc && row.dataset.group === dragSrc?.dataset.group) {
+        row.classList.add('drag-over');
+      }
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || row === dragSrc) return;
+      if (row.dataset.group !== dragSrc.dataset.group) return;
+      const g = row.dataset.group;
+      const from = groups[g].indexOf(dragSrc.dataset.team);
+      const to = groups[g].indexOf(row.dataset.team);
+      if (from === -1 || to === -1) return;
+      groups[g].splice(from, 1);
+      groups[g].splice(to, 0, dragSrc.dataset.team);
+      renderGroups();
+      rebuildBracket();
+    });
+  });
+}
+
+// ─── THIRDS ─────────────────────────────────────────────────────────────────
+function renderThirds() {
+  const grid = document.getElementById('thirds-grid');
+  grid.innerHTML = '';
+  for (const letter of Object.keys(groups)) {
+    const team = groups[letter][2]; // 3rd place
+    if (!team) continue;
+    const flag = [...team][0];
+    const name = getTeamName(team);
+    const sel = thirds.has(team);
+    const div = document.createElement('div');
+    div.className = 'third-team' + (sel ? ' selected' : '');
+    div.innerHTML = `<span class="third-check">${sel ? '✓' : '○'}</span><span class="team-flag">${flag}</span><span class="third-team-name">${name}</span>`;
+    div.onclick = () => toggleThird(team);
+    grid.appendChild(div);
+  }
+  updateThirdsCounter();
+}
+
+function toggleThird(team) {
+  if (thirds.has(team)) {
+    thirds.delete(team);
+  } else {
+    if (thirds.size >= 8) return;
+    thirds.add(team);
+  }
+  renderThirds();
+  rebuildBracket();
+}
+
+function updateThirdsCounter() {
+  const el = document.getElementById('thirds-counter');
+  el.textContent = `${thirds.size} / 8`;
+  el.className = 'thirds-counter' + (thirds.size === 8 ? '' : ' warning');
+}
+
+// ─── BRACKET ─────────────────────────────────────────────────────────────────
+// Round of 32: 16 matches
+// R16: 8, QF: 4, SF: 2, Final: 1 — total 31 matches
+
+const ROUND_NAMES = ["Ronda de 32","Octavos","Cuartos","Semifinales","Final"];
+
+function getQualifiers() {
+  // returns array of 32 teams in bracket order
+  const q = [];
+  for (const letter of Object.keys(groups)) {
+    q.push({ team: groups[letter][0], source: `1°${letter}` });
+    q.push({ team: groups[letter][1], source: `2°${letter}` });
+  }
+  const thirdList = [...thirds].map(t => ({ team: t, source: `3°` }));
+  // pad to 32
+  const all = [...q, ...thirdList];
+  while (all.length < 32) all.push({ team: null, source: '–' });
+  return all.slice(0, 32);
+}
+
+function rebuildBracket() {
+  // Preserve existing winners where teams still match
+  buildBracket();
+  renderBracket();
+  updateProgress();
+  renderRanking();
+}
+
+let bracketRounds = []; // array of rounds, each round = array of {id, t1, t2, winner}
+
+function buildBracket() {
+  const quals = getQualifiers();
+  bracketRounds = [];
+
+  // Round of 32 (16 matches)
+  const r32 = [];
+  for (let i = 0; i < 16; i++) {
+    const id = `r32_${i}`;
+    const t1 = quals[i*2]?.team;
+    const t2 = quals[i*2+1]?.team;
+    const prev = matches[id];
+    const winner = (prev && prev.t1 === t1 && prev.t2 === t2) ? prev.winner : null;
+    r32.push({ id, t1, t2, winner });
+    matches[id] = { t1, t2, winner };
+  }
+  bracketRounds.push(r32);
+
+  // Build subsequent rounds
+  const roundKeys = ['r16','qf','sf','final'];
+  for (let round = 0; round < 4; round++) {
+    const prev = bracketRounds[round];
+    const cur = [];
+    const matchCount = prev.length / 2;
+    for (let i = 0; i < matchCount; i++) {
+      const id = `${roundKeys[round]}_${i}`;
+      const t1 = prev[i*2]?.winner;
+      const t2 = prev[i*2+1]?.winner;
+      const prevMatch = matches[id];
+      const winner = (prevMatch && prevMatch.t1 === t1 && prevMatch.t2 === t2) ? prevMatch.winner : null;
+      cur.push({ id, t1, t2, winner });
+      matches[id] = { t1, t2, winner };
+    }
+    bracketRounds.push(cur);
+  }
+}
+
+function renderBracket() {
+  const bracket = document.getElementById('bracket');
+  bracket.innerHTML = '';
+
+  bracketRounds.forEach((round, ri) => {
+    const col = document.createElement('div');
+    col.className = 'bracket-round';
+    col.innerHTML = `<div class="round-label">${ROUND_NAMES[ri]}</div>`;
+
+    const matchesDiv = document.createElement('div');
+    matchesDiv.className = 'round-matches';
+
+    round.forEach(m => {
+      const matchEl = document.createElement('div');
+      matchEl.className = 'match';
+      matchEl.innerHTML = `<div class="match-label">${m.id.replace(/_\d+$/,'').toUpperCase()}</div>` +
+        teamMatchRow(m, m.t1) + teamMatchRow(m, m.t2);
+      matchesDiv.appendChild(matchEl);
+    });
+
+    col.appendChild(matchesDiv);
+    bracket.appendChild(col);
+  });
+}
+
+function teamMatchRow(m, team) {
+  if (!team) {
+    return `<div class="match-team"><span class="tbd">Por definir</span></div>`;
+  }
+  const flag = [...team][0];
+  const name = getTeamName(team);
+  let cls = '';
+  if (m.winner === team) cls = 'winner';
+  else if (m.winner && m.winner !== team) cls = 'loser';
+  return `<div class="match-team ${cls}" onclick="setWinner('${m.id}','${team.replace(/'/g,"\\'")}')">
+    <span class="flag">${flag}</span> ${name}
+  </div>`;
+}
+
+function setWinner(matchId, team) {
+  const m = matches[matchId];
+  if (!m || !m.t1 || !m.t2) return;
+  if (!m.t1.includes(team.split(' ')[1] || team) && m.t1 !== team && m.t2 !== team) return;
+  // toggle
+  m.winner = (m.winner === team) ? null : team;
+  matches[matchId] = m;
+  // update bracketRounds
+  for (const round of bracketRounds) {
+    const found = round.find(x => x.id === matchId);
+    if (found) { found.winner = m.winner; break; }
+  }
+  // cascade clear downstream
+  clearDownstream(matchId);
+  buildBracket();
+  renderBracket();
+  updateProgress();
+  renderRanking();
+}
+
+function clearDownstream(matchId) {
+  // Find which round/index this match is in and clear all subsequent rounds' dependent matches
+  for (let ri = 0; ri < bracketRounds.length; ri++) {
+    const idx = bracketRounds[ri].findIndex(m => m.id === matchId);
+    if (idx !== -1) {
+      // clear rounds ri+1 onward for the dependent match
+      for (let rj = ri + 1; rj < bracketRounds.length; rj++) {
+        const depIdx = Math.floor(idx / Math.pow(2, rj - ri));
+        const dep = bracketRounds[rj]?.[depIdx];
+        if (dep) {
+          dep.winner = null;
+          if (matches[dep.id]) matches[dep.id].winner = null;
+        }
+      }
+      break;
+    }
+  }
+}
+
+function updateProgress() {
+  const total = Object.keys(matches).length;
+  const done = Object.values(matches).filter(m => m.winner).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('bracket-progress').style.width = pct + '%';
+}
+
+// ─── RANKING ─────────────────────────────────────────────────────────────────
+function getStage(team) {
+  // Check from final backwards
+  const roundOrder = ['final','sf','qf','r16','r32'];
+  for (const round of roundOrder) {
+    const roundMatches = Object.entries(matches).filter(([id]) => id.startsWith(round + '_'));
+    for (const [id, m] of roundMatches) {
+      if (m.winner === team) {
+        if (round === 'final') return { stage: 'Campeón', order: 1 };
+      }
+      if ((m.t1 === team || m.t2 === team) && m.winner && m.winner !== team) {
+        if (round === 'final') return { stage: 'Finalista', order: 2 };
+        if (round === 'sf') return { stage: 'Semifinal', order: 3 };
+        if (round === 'qf') return { stage: 'Cuartos', order: 4 };
+        if (round === 'r16') return { stage: 'Octavos', order: 5 };
+        if (round === 'r32') return { stage: 'Ronda de 32', order: 6 };
+      }
+    }
+  }
+  // Check if qualified
+  const allR32 = Object.entries(matches).filter(([id]) => id.startsWith('r32_'));
+  for (const [id, m] of allR32) {
+    if (m.t1 === team || m.t2 === team) return { stage: 'Ronda de 32', order: 6 };
+  }
+  return { stage: 'Fase de Grupos', order: 7 };
+}
+
+function renderRanking() {
+  // Collect all 48 teams with their stage
+  const allTeams = [];
+  for (const [letter, teamList] of Object.entries(groups)) {
+    teamList.forEach((team, idx) => {
+      const { stage, order } = getStage(team);
+      let posOrder = (letter.charCodeAt(0) - 65) * 4 + idx;
+      allTeams.push({ team, group: letter, pos: idx+1, stage, order, posOrder });
+    });
+  }
+
+  allTeams.sort((a,b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    // within same stage, sort by group pos
+    if (a.pos !== b.pos) return a.pos - b.pos;
+    return a.posOrder - b.posOrder;
+  });
+
+  const tbody = document.querySelector('#ranking-table tbody');
+  tbody.innerHTML = '';
+  const stageClass = {
+    'Campeón': 'stage-winner',
+    'Finalista': 'stage-final',
+    'Semifinal': 'stage-semi',
+    'Cuartos': 'stage-quarter',
+    'Octavos': 'stage-r16',
+    'Ronda de 32': 'stage-r16',
+    'Fase de Grupos': 'stage-groups'
+  };
+
+  allTeams.forEach((t, i) => {
+    const flag = [...t.team][0];
+    const name = getTeamName(t.team);
+    const cls = i < 3 ? `rank-${i+1}` : '';
+    tbody.innerHTML += `<tr class="${cls}">
+      <td class="rank-num">${i+1}</td>
+      <td><span style="margin-right:6px">${flag}</span>${name}</td>
+      <td style="color:var(--muted)">Grupo ${t.group} (${t.pos}°)</td>
+      <td><span class="stage-badge ${stageClass[t.stage]}">${t.stage}</span></td>
+    </tr>`;
+  });
+}
+
+// ─── EXPORT EXCEL ─────────────────────────────────────────────────────────────
+function exportExcel() {
+  const rows = [['Posición','Equipo','Grupo','Posición en Grupo','Fase Alcanzada']];
+  const allTeams = [];
+  for (const [letter, teamList] of Object.entries(groups)) {
+    teamList.forEach((team, idx) => {
+      const { stage, order } = getStage(team);
+      allTeams.push({ team, group: letter, pos: idx+1, stage, order, posOrder: (letter.charCodeAt(0)-65)*4+idx });
+    });
+  }
+  allTeams.sort((a,b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    if (a.pos !== b.pos) return a.pos - b.pos;
+    return a.posOrder - b.posOrder;
+  });
+  allTeams.forEach((t, i) => {
+    rows.push([i+1, getTeamName(t.team), `Grupo ${t.group}`, `${t.pos}°`, t.stage]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:8},{wch:24},{wch:12},{wch:18},{wch:20}];
+
+  // Style header row
+  ['A1','B1','C1','D1','E1'].forEach(cell => {
+    if (!ws[cell]) return;
+    ws[cell].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '0F172A' } } };
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Clasificación Final');
+
+  // Second sheet: bracket results
+  const bracketRows = [['Ronda','Partido','Equipo 1','Equipo 2','Ganador']];
+  for (const [id, m] of Object.entries(matches)) {
+    if (!m.t1 && !m.t2) continue;
+    const round = id.split('_')[0].toUpperCase();
+    const num = parseInt(id.split('_')[1]) + 1;
+    bracketRows.push([round, num, m.t1 ? getTeamName(m.t1) : '–', m.t2 ? getTeamName(m.t2) : '–', m.winner ? getTeamName(m.winner) : '–']);
+  }
+  const ws2 = XLSX.utils.aoa_to_sheet(bracketRows);
+  ws2['!cols'] = [{wch:12},{wch:8},{wch:24},{wch:24},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resultados Eliminatorias');
+
+  XLSX.writeFile(wb, 'Mundial2026_Clasificacion.xlsx');
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'bracket') { buildBracket(); renderBracket(); updateProgress(); }
+  if (name === 'ranking') renderRanking();
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+initGroups();
+buildBracket();
+renderBracket();
+renderRanking();
+</script>
+</body>
+</html>
