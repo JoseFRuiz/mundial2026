@@ -381,6 +381,24 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .reset-thirds-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 7px 14px;
+    background: transparent;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .reset-thirds-btn:hover { background: rgba(245,158,11,0.1); }
+
   .tbd {
     color: var(--muted);
     font-style: italic;
@@ -519,8 +537,12 @@
 </div>
 
 <div id="page-bracket" class="page">
-  <div class="info-banner">
-    Hacé clic en un equipo para marcarlo como ganador del partido. Los ganadores avanzan automáticamente a la siguiente ronda.</div>
+  <div class="info-banner" style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <span>Hacé clic en un equipo para marcarlo como ganador del partido. Los ganadores avanzan automáticamente a la siguiente ronda.</span>
+    <button class="reset-thirds-btn" onclick="resetThirdAssignments()" title="Limpiar todas las asignaciones de mejores terceros en la ronda de 32">
+      ↺ Restablecer mejores terceros
+    </button>
+  </div>
   <div class="progress-bar"><div class="progress-fill" id="bracket-progress" style="width:0%"></div></div>
   <div class="bracket-container">
     <div class="bracket" id="bracket"></div>
@@ -869,7 +891,12 @@ function teamMatchRow(m, team, thirdPools, isThirdSlot) {
     // Show dropdown of eligible thirds
     const candidates = getThirdsFor(thirdPools);
     const assigned = thirdAssignments[m.id] || '';
-    const opts = candidates.map(t => {
+    // Teams already used in other slots
+    const usedElsewhere = new Set(
+      Object.entries(thirdAssignments).filter(([mid,t]) => mid !== m.id && t).map(([,t]) => t)
+    );
+    const available = candidates.filter(t => t === assigned || !usedElsewhere.has(t));
+    const opts = available.map(t => {
       const n = getTeamName(t);
       const g = Object.keys(groups).find(g => groups[g][2] === t);
       return `<option value="${t}" ${t === assigned ? 'selected' : ''}>3°${g} ${n}</option>`;
@@ -896,9 +923,29 @@ function teamMatchRow(m, team, thirdPools, isThirdSlot) {
 }
 
 function assignThird(matchId, team) {
+  const prev = thirdAssignments[matchId];
+  // If this team is already assigned to another match, do nothing
+  if (team) {
+    const alreadyUsed = Object.entries(thirdAssignments).some(([mid, t]) => mid !== matchId && t === team);
+    if (alreadyUsed) return;
+  }
   thirdAssignments[matchId] = team || null;
-  // clear winner if third changed
   if (matches[matchId]) matches[matchId].winner = null;
+  buildBracket();
+  renderBracket();
+  updateProgress();
+  renderRanking();
+}
+
+function resetThirdAssignments() {
+  thirdAssignments = {};
+  // Clear winners of all r32 matches that had a third slot
+  R32_MATCHUPS.forEach((def, i) => {
+    if (!def.getT2) {
+      const id = `r32_${i}`;
+      if (matches[id]) matches[id].winner = null;
+    }
+  });
   buildBracket();
   renderBracket();
   updateProgress();
