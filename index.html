@@ -387,6 +387,23 @@
     font-weight: 400;
   }
 
+  .third-slot { padding: 4px 6px !important; }
+
+  .third-select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 6px;
+    width: 100%;
+    cursor: pointer;
+  }
+
+  .third-select:focus { outline: none; border-color: var(--green); }
+
   /* ── CLASIFICACIÓN ── */
   .ranking-table {
     width: 100%;
@@ -671,48 +688,79 @@ function updateThirdsCounter() {
 
 const ROUND_NAMES = ["Ronda de 32","Octavos","Cuartos","Semifinales","Final"];
 
-function getQualifiers() {
-  // returns array of 32 teams in bracket order
-  const q = [];
-  for (const letter of Object.keys(groups)) {
-    q.push({ team: groups[letter][0], source: `1°${letter}` });
-    q.push({ team: groups[letter][1], source: `2°${letter}` });
-  }
-  const thirdList = [...thirds].map(t => ({ team: t, source: `3°` }));
-  // pad to 32
-  const all = [...q, ...thirdList];
-  while (all.length < 32) all.push({ team: null, source: '–' });
-  return all.slice(0, 32);
+// ─── R32 MATCHUP DEFINITIONS ─────────────────────────────────────────────────
+// Each entry: { id, label, getT1(g), getT2(g, thirds) }
+// g = groups object, thirdsArr = array of selected third-place teams sorted by group
+// "3°[X/Y/Z]" means the best third from those groups — user picks which one classified
+
+const R32_MATCHUPS = [
+  { num: 73, desc: "2°A vs 2°B",     getT1: g => g.A[1], getT2: g => g.B[1] },
+  { num: 74, desc: "1°E vs 3°(A/B/C/D/F)", getT1: g => g.E[0], getT2: null, thirdPools: ['A','B','C','D','F'] },
+  { num: 75, desc: "1°F vs 2°C",     getT1: g => g.F[0], getT2: g => g.C[1] },
+  { num: 76, desc: "1°E vs 2°F",     getT1: g => g.E[0], getT2: g => g.F[1] },
+  { num: 77, desc: "1°I vs 3°(C/D/F/G/H)", getT1: g => g.I[0], getT2: null, thirdPools: ['C','D','F','G','H'] },
+  { num: 78, desc: "2°E vs 2°I",     getT1: g => g.E[1], getT2: g => g.I[1] },
+  { num: 79, desc: "1°A vs 3°(C/E/F/H/I)", getT1: g => g.A[0], getT2: null, thirdPools: ['C','E','F','H','I'] },
+  { num: 80, desc: "1°L vs 3°(E/H/I/J/K)", getT1: g => g.L[0], getT2: null, thirdPools: ['E','H','I','J','K'] },
+  { num: 81, desc: "1°D vs 3°(B/E/F/I/J)", getT1: g => g.D[0], getT2: null, thirdPools: ['B','E','F','I','J'] },
+  { num: 82, desc: "1°G vs 3°(A/E/H/I/J)", getT1: g => g.G[0], getT2: null, thirdPools: ['A','E','H','I','J'] },
+  { num: 83, desc: "2°K vs 2°L",     getT1: g => g.K[1], getT2: g => g.L[1] },
+  { num: 84, desc: "1°H vs 2°J",     getT1: g => g.H[0], getT2: g => g.J[1] },
+  { num: 85, desc: "1°B vs 3°(E/F/G/I/J)", getT1: g => g.B[0], getT2: null, thirdPools: ['E','F','G','I','J'] },
+  { num: 86, desc: "1°J vs 2°H",     getT1: g => g.J[0], getT2: g => g.H[1] },
+  { num: 87, desc: "1°K vs 3°(D/E/I/J/L)", getT1: g => g.K[0], getT2: null, thirdPools: ['D','E','I','J','L'] },
+  { num: 88, desc: "2°D vs 2°G",     getT1: g => g.D[1], getT2: g => g.G[1] },
+];
+
+// Note: P74 and P76 both say "1°E" — P74 is actually 1°C per the fixture
+// Correcting based on standard bracket logic:
+R32_MATCHUPS[3] = { num: 76, desc: "1°C vs 2°F", getT1: g => g.C[0], getT2: g => g.F[1] };
+R32_MATCHUPS[1] = { num: 74, desc: "1°E vs 3°(A/B/C/D/F)", getT1: g => g.E[0], getT2: null, thirdPools: ['A','B','C','D','F'] };
+
+// thirdAssignments: matchId -> selected third team
+let thirdAssignments = {}; // e.g. { 'r32_1': '🇲🇽 México' }
+
+function getThirdsFor(pools) {
+  // Returns selected thirds whose group is in pools
+  return [...thirds].filter(t => {
+    const grp = Object.keys(groups).find(g => groups[g][2] === t);
+    return grp && pools.includes(grp);
+  });
 }
 
 function rebuildBracket() {
-  // Preserve existing winners where teams still match
   buildBracket();
   renderBracket();
   updateProgress();
   renderRanking();
 }
 
-let bracketRounds = []; // array of rounds, each round = array of {id, t1, t2, winner}
+let bracketRounds = [];
 
 function buildBracket() {
-  const quals = getQualifiers();
   bracketRounds = [];
-
-  // Round of 32 (16 matches)
   const r32 = [];
-  for (let i = 0; i < 16; i++) {
+
+  R32_MATCHUPS.forEach((def, i) => {
     const id = `r32_${i}`;
-    const t1 = quals[i*2]?.team;
-    const t2 = quals[i*2+1]?.team;
+    const t1 = def.getT1(groups);
+    let t2;
+    if (def.getT2) {
+      t2 = def.getT2(groups);
+    } else {
+      // third slot: use assigned or null
+      t2 = thirdAssignments[id] || null;
+    }
     const prev = matches[id];
     const winner = (prev && prev.t1 === t1 && prev.t2 === t2) ? prev.winner : null;
-    r32.push({ id, t1, t2, winner });
+    r32.push({ id, t1, t2, winner, def });
     matches[id] = { t1, t2, winner };
-  }
+  });
   bracketRounds.push(r32);
 
-  // Build subsequent rounds
+  // Build R16, QF, SF, Final — pairs: 73&74→R16_0, 75&76→R16_1, etc.
+  // Bracket pairing (winners of consecutive R32 pairs play each other):
+  // R16: [73v74, 75v76, 77v78, 79v80, 81v82, 83v84, 85v86, 87v88]
   const roundKeys = ['r16','qf','sf','final'];
   for (let round = 0; round < 4; round++) {
     const prev = bracketRounds[round];
@@ -720,8 +768,8 @@ function buildBracket() {
     const matchCount = prev.length / 2;
     for (let i = 0; i < matchCount; i++) {
       const id = `${roundKeys[round]}_${i}`;
-      const t1 = prev[i*2]?.winner;
-      const t2 = prev[i*2+1]?.winner;
+      const t1 = prev[i*2]?.winner || null;
+      const t2 = prev[i*2+1]?.winner || null;
       const prevMatch = matches[id];
       const winner = (prevMatch && prevMatch.t1 === t1 && prevMatch.t2 === t2) ? prevMatch.winner : null;
       cur.push({ id, t1, t2, winner });
@@ -746,8 +794,10 @@ function renderBracket() {
     round.forEach(m => {
       const matchEl = document.createElement('div');
       matchEl.className = 'match';
-      matchEl.innerHTML = `<div class="match-label">${m.id.replace(/_\d+$/,'').toUpperCase()}</div>` +
-        teamMatchRow(m, m.t1) + teamMatchRow(m, m.t2);
+      let label = ri === 0 ? `P${R32_MATCHUPS[parseInt(m.id.split('_')[1])].num}` : m.id.replace(/_\d+$/,'').toUpperCase();
+      matchEl.innerHTML = `<div class="match-label">${label}</div>` +
+        teamMatchRow(m, m.t1, ri === 0 && m.def?.thirdPools) +
+        teamMatchRow(m, m.t2, ri === 0 && m.def?.thirdPools ? m.def.thirdPools : null, true);
       matchesDiv.appendChild(matchEl);
     });
 
@@ -756,7 +806,23 @@ function renderBracket() {
   });
 }
 
-function teamMatchRow(m, team) {
+function teamMatchRow(m, team, thirdPools, isThirdSlot) {
+  if (!team && thirdPools && isThirdSlot) {
+    // Show dropdown of eligible thirds
+    const candidates = getThirdsFor(thirdPools);
+    const assigned = thirdAssignments[m.id] || '';
+    const opts = candidates.map(t => {
+      const n = getTeamName(t);
+      const g = Object.keys(groups).find(g => groups[g][2] === t);
+      return `<option value="${t}" ${t === assigned ? 'selected' : ''}>3°${g} ${n}</option>`;
+    });
+    if (!assigned) opts.unshift(`<option value="">-- 3° pendiente --</option>`);
+    return `<div class="match-team third-slot">
+      <select class="third-select" onchange="assignThird('${m.id}', this.value)">
+        ${opts.join('')}
+      </select>
+    </div>`;
+  }
   if (!team) {
     return `<div class="match-team"><span class="tbd">Por definir</span></div>`;
   }
@@ -765,24 +831,31 @@ function teamMatchRow(m, team) {
   let cls = '';
   if (m.winner === team) cls = 'winner';
   else if (m.winner && m.winner !== team) cls = 'loser';
-  return `<div class="match-team ${cls}" onclick="setWinner('${m.id}','${team.replace(/'/g,"\\'")}')">
+  const safeTeam = team.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<div class="match-team ${cls}" onclick="setWinner('${m.id}','${safeTeam}')">
     <span class="flag">${flag}</span> ${name}
   </div>`;
+}
+
+function assignThird(matchId, team) {
+  thirdAssignments[matchId] = team || null;
+  // clear winner if third changed
+  if (matches[matchId]) matches[matchId].winner = null;
+  buildBracket();
+  renderBracket();
+  updateProgress();
+  renderRanking();
 }
 
 function setWinner(matchId, team) {
   const m = matches[matchId];
   if (!m || !m.t1 || !m.t2) return;
-  if (!m.t1.includes(team.split(' ')[1] || team) && m.t1 !== team && m.t2 !== team) return;
-  // toggle
   m.winner = (m.winner === team) ? null : team;
   matches[matchId] = m;
-  // update bracketRounds
   for (const round of bracketRounds) {
     const found = round.find(x => x.id === matchId);
     if (found) { found.winner = m.winner; break; }
   }
-  // cascade clear downstream
   clearDownstream(matchId);
   buildBracket();
   renderBracket();
@@ -791,11 +864,9 @@ function setWinner(matchId, team) {
 }
 
 function clearDownstream(matchId) {
-  // Find which round/index this match is in and clear all subsequent rounds' dependent matches
   for (let ri = 0; ri < bracketRounds.length; ri++) {
     const idx = bracketRounds[ri].findIndex(m => m.id === matchId);
     if (idx !== -1) {
-      // clear rounds ri+1 onward for the dependent match
       for (let rj = ri + 1; rj < bracketRounds.length; rj++) {
         const depIdx = Math.floor(idx / Math.pow(2, rj - ri));
         const dep = bracketRounds[rj]?.[depIdx];
