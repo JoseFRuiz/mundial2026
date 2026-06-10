@@ -686,7 +686,7 @@ function updateThirdsCounter() {
 // Round of 32: 16 matches
 // R16: 8, QF: 4, SF: 2, Final: 1 — total 31 matches
 
-const ROUND_NAMES = ["Ronda de 32","Octavos","Cuartos","Semifinales","Final"];
+const ROUND_NAMES = ["Ronda de 32","Octavos","Cuartos","Semifinales","3er Puesto / Final"];
 
 // ─── R32 MATCHUP DEFINITIONS ─────────────────────────────────────────────────
 // Each entry: { id, label, getT1(g), getT2(g, thirds) }
@@ -758,25 +758,80 @@ function buildBracket() {
   });
   bracketRounds.push(r32);
 
-  // Build R16, QF, SF, Final — pairs: 73&74→R16_0, 75&76→R16_1, etc.
-  // Bracket pairing (winners of consecutive R32 pairs play each other):
-  // R16: [73v74, 75v76, 77v78, 79v80, 81v82, 83v84, 85v86, 87v88]
-  const roundKeys = ['r16','qf','sf','final'];
-  for (let round = 0; round < 4; round++) {
-    const prev = bracketRounds[round];
-    const cur = [];
-    const matchCount = prev.length / 2;
-    for (let i = 0; i < matchCount; i++) {
-      const id = `${roundKeys[round]}_${i}`;
-      const t1 = prev[i*2]?.winner || null;
-      const t2 = prev[i*2+1]?.winner || null;
-      const prevMatch = matches[id];
-      const winner = (prevMatch && prevMatch.t1 === t1 && prevMatch.t2 === t2) ? prevMatch.winner : null;
-      cur.push({ id, t1, t2, winner });
-      matches[id] = { t1, t2, winner };
-    }
-    bracketRounds.push(cur);
-  }
+  // R16 pairings (P89-P96):
+  // P89: W(P74) vs W(P77)  => r32[1] vs r32[4]
+  // P90: W(P73) vs W(P75)  => r32[0] vs r32[2]
+  // P91: W(P76) vs W(P78)  => r32[3] vs r32[5]
+  // P92: W(P79) vs W(P80)  => r32[6] vs r32[7]
+  // P93: W(P83) vs W(P84)  => r32[10] vs r32[11]
+  // P94: W(P81) vs W(P82)  => r32[8] vs r32[9]
+  // P95: W(P86) vs W(P88)  => r32[13] vs r32[15]
+  // P96: W(P85) vs W(P87)  => r32[12] vs r32[14]
+  const R16_PAIRS = [[1,4],[0,2],[3,5],[6,7],[10,11],[8,9],[13,15],[12,14]];
+  const R16_NUMS  = [89,90,91,92,93,94,95,96];
+  const r16 = R16_PAIRS.map(([a,b], i) => {
+    const id = `r16_${i}`;
+    const t1 = r32[a].winner || null;
+    const t2 = r32[b].winner || null;
+    const prev = matches[id];
+    const winner = (prev && prev.t1===t1 && prev.t2===t2) ? prev.winner : null;
+    matches[id] = {t1,t2,winner};
+    return {id,t1,t2,winner,num:R16_NUMS[i]};
+  });
+  bracketRounds.push(r16);
+
+  // QF pairings (P97-P100):
+  // P97: W(P89) vs W(P90) => r16[0] vs r16[1]
+  // P98: W(P93) vs W(P94) => r16[4] vs r16[5]
+  // P99: W(P91) vs W(P92) => r16[2] vs r16[3]
+  // P100: W(P95) vs W(P96) => r16[6] vs r16[7]
+  const QF_PAIRS = [[0,1],[4,5],[2,3],[6,7]];
+  const QF_NUMS  = [97,98,99,100];
+  const qf = QF_PAIRS.map(([a,b], i) => {
+    const id = `qf_${i}`;
+    const t1 = r16[a].winner || null;
+    const t2 = r16[b].winner || null;
+    const prev = matches[id];
+    const winner = (prev && prev.t1===t1 && prev.t2===t2) ? prev.winner : null;
+    matches[id] = {t1,t2,winner};
+    return {id,t1,t2,winner,num:QF_NUMS[i]};
+  });
+  bracketRounds.push(qf);
+
+  // SF pairings (P101-P102):
+  // P101: W(P97) vs W(P98) => qf[0] vs qf[1]
+  // P102: W(P99) vs W(P100) => qf[2] vs qf[3]
+  const SF_PAIRS = [[0,1],[2,3]];
+  const SF_NUMS  = [101,102];
+  const sf = SF_PAIRS.map(([a,b], i) => {
+    const id = `sf_${i}`;
+    const t1 = qf[a].winner || null;
+    const t2 = qf[b].winner || null;
+    const prev = matches[id];
+    const winner = (prev && prev.t1===t1 && prev.t2===t2) ? prev.winner : null;
+    matches[id] = {t1,t2,winner};
+    return {id,t1,t2,winner,num:SF_NUMS[i]};
+  });
+  bracketRounds.push(sf);
+
+  // Last round: P103 (3rd place) and P104 (Final)
+  // P103: L(P101) vs L(P102) — losers of semis
+  const loser101 = sf[0].winner ? (sf[0].t1===sf[0].winner ? sf[0].t2 : sf[0].t1) : null;
+  const loser102 = sf[1].winner ? (sf[1].t1===sf[1].winner ? sf[1].t2 : sf[1].t1) : null;
+  const m103id = 'p103';
+  const prev103 = matches[m103id];
+  const w103 = (prev103 && prev103.t1===loser101 && prev103.t2===loser102) ? prev103.winner : null;
+  matches[m103id] = {t1:loser101, t2:loser102, winner:w103};
+
+  const m104id = 'p104';
+  const prev104 = matches[m104id];
+  const w104 = (prev104 && prev104.t1===sf[0].winner && prev104.t2===sf[1].winner) ? prev104.winner : null;
+  matches[m104id] = {t1:sf[0].winner||null, t2:sf[1].winner||null, winner:w104};
+
+  bracketRounds.push([
+    {id:m103id, t1:loser101, t2:loser102, winner:w103, num:103, label:'3er Puesto'},
+    {id:m104id, t1:sf[0].winner||null, t2:sf[1].winner||null, winner:w104, num:104, label:'Final'}
+  ]);
 }
 
 function renderBracket() {
@@ -794,7 +849,10 @@ function renderBracket() {
     round.forEach(m => {
       const matchEl = document.createElement('div');
       matchEl.className = 'match';
-      let label = ri === 0 ? `P${R32_MATCHUPS[parseInt(m.id.split('_')[1])].num}` : m.id.replace(/_\d+$/,'').toUpperCase();
+      let label;
+      if (m.num) label = `P${m.num}${m.label ? ' — '+m.label : ''}`;
+      else if (ri === 0) label = `P${R32_MATCHUPS[parseInt(m.id.split('_')[1])].num}`;
+      else label = m.id.replace(/_\d+$/,'').toUpperCase();
       matchEl.innerHTML = `<div class="match-label">${label}</div>` +
         teamMatchRow(m, m.t1, ri === 0 && m.def?.thirdPools) +
         teamMatchRow(m, m.t2, ri === 0 && m.def?.thirdPools ? m.def.thirdPools : null, true);
@@ -864,15 +922,27 @@ function setWinner(matchId, team) {
 }
 
 function clearDownstream(matchId) {
-  for (let ri = 0; ri < bracketRounds.length; ri++) {
+  // p103/p104 have no downstream
+  if (matchId === 'p103' || matchId === 'p104') return;
+  for (let ri = 0; ri < bracketRounds.length - 1; ri++) {
     const idx = bracketRounds[ri].findIndex(m => m.id === matchId);
     if (idx !== -1) {
+      // Clear all subsequent rounds that depend on this match
+      // Last round (p103/p104) is special — just clear both
       for (let rj = ri + 1; rj < bracketRounds.length; rj++) {
-        const depIdx = Math.floor(idx / Math.pow(2, rj - ri));
-        const dep = bracketRounds[rj]?.[depIdx];
-        if (dep) {
-          dep.winner = null;
-          if (matches[dep.id]) matches[dep.id].winner = null;
+        if (rj === bracketRounds.length - 1) {
+          // final round: clear p103 and p104
+          bracketRounds[rj].forEach(dep => {
+            dep.winner = null;
+            if (matches[dep.id]) matches[dep.id].winner = null;
+          });
+        } else {
+          const depIdx = Math.floor(idx / Math.pow(2, rj - ri));
+          const dep = bracketRounds[rj]?.[depIdx];
+          if (dep) {
+            dep.winner = null;
+            if (matches[dep.id]) matches[dep.id].winner = null;
+          }
         }
       }
       break;
@@ -889,29 +959,45 @@ function updateProgress() {
 
 // ─── RANKING ─────────────────────────────────────────────────────────────────
 function getStage(team) {
-  // Check from final backwards
-  const roundOrder = ['final','sf','qf','r16','r32'];
-  for (const round of roundOrder) {
-    const roundMatches = Object.entries(matches).filter(([id]) => id.startsWith(round + '_'));
-    for (const [id, m] of roundMatches) {
-      if (m.winner === team) {
-        if (round === 'final') return { stage: 'Campeón', order: 1 };
-      }
-      if ((m.t1 === team || m.t2 === team) && m.winner && m.winner !== team) {
-        if (round === 'final') return { stage: 'Finalista', order: 2 };
-        if (round === 'sf') return { stage: 'Semifinal', order: 3 };
-        if (round === 'qf') return { stage: 'Cuartos', order: 4 };
-        if (round === 'r16') return { stage: 'Octavos', order: 5 };
-        if (round === 'r32') return { stage: 'Ronda de 32', order: 6 };
-      }
-    }
+  const m104 = matches['p104'];
+  const m103 = matches['p103'];
+  // Champion
+  if (m104?.winner === team) return { stage: 'Campeón 🏆', order: 1 };
+  // Finalist (lost final)
+  if (m104 && (m104.t1===team||m104.t2===team) && m104.winner && m104.winner!==team)
+    return { stage: 'Finalista', order: 2 };
+  // 3rd place winner
+  if (m103?.winner === team) return { stage: '3er Puesto', order: 3 };
+  // 3rd place loser (4th)
+  if (m103 && (m103.t1===team||m103.t2===team) && m103.winner && m103.winner!==team)
+    return { stage: '4° Puesto', order: 4 };
+  // SF losers (reached final four)
+  for (const sfid of ['sf_0','sf_1']) {
+    const m = matches[sfid];
+    if (m && (m.t1===team||m.t2===team) && m.winner && m.winner!==team)
+      return { stage: 'Semifinal', order: 5 };
   }
-  // Check if qualified
-  const allR32 = Object.entries(matches).filter(([id]) => id.startsWith('r32_'));
-  for (const [id, m] of allR32) {
-    if (m.t1 === team || m.t2 === team) return { stage: 'Ronda de 32', order: 6 };
+  // QF losers
+  for (let i=0;i<4;i++) {
+    const m = matches[`qf_${i}`];
+    if (m && (m.t1===team||m.t2===team) && m.winner && m.winner!==team)
+      return { stage: 'Cuartos', order: 6 };
   }
-  return { stage: 'Fase de Grupos', order: 7 };
+  // R16 losers
+  for (let i=0;i<8;i++) {
+    const m = matches[`r16_${i}`];
+    if (m && (m.t1===team||m.t2===team) && m.winner && m.winner!==team)
+      return { stage: 'Octavos', order: 7 };
+  }
+  // R32 losers / participants
+  for (let i=0;i<16;i++) {
+    const m = matches[`r32_${i}`];
+    if (!m) continue;
+    if (m.winner && m.winner!==team && (m.t1===team||m.t2===team))
+      return { stage: 'Ronda de 32', order: 8 };
+    if (m.t1===team||m.t2===team) return { stage: 'Ronda de 32', order: 8 };
+  }
+  return { stage: 'Fase de Grupos', order: 9 };
 }
 
 function renderRanking() {
@@ -935,8 +1021,10 @@ function renderRanking() {
   const tbody = document.querySelector('#ranking-table tbody');
   tbody.innerHTML = '';
   const stageClass = {
-    'Campeón': 'stage-winner',
+    'Campeón 🏆': 'stage-winner',
     'Finalista': 'stage-final',
+    '3er Puesto': 'stage-semi',
+    '4° Puesto': 'stage-semi',
     'Semifinal': 'stage-semi',
     'Cuartos': 'stage-quarter',
     'Octavos': 'stage-r16',
@@ -992,9 +1080,16 @@ function exportExcel() {
   const bracketRows = [['Ronda','Partido','Equipo 1','Equipo 2','Ganador']];
   for (const [id, m] of Object.entries(matches)) {
     if (!m.t1 && !m.t2) continue;
-    const round = id.split('_')[0].toUpperCase();
-    const num = parseInt(id.split('_')[1]) + 1;
-    bracketRows.push([round, num, m.t1 ? getTeamName(m.t1) : '–', m.t2 ? getTeamName(m.t2) : '–', m.winner ? getTeamName(m.winner) : '–']);
+    let roundLabel, matchNum;
+    if (id === 'p103') { roundLabel = '3er Puesto'; matchNum = 103; }
+    else if (id === 'p104') { roundLabel = 'Final'; matchNum = 104; }
+    else {
+      const parts = id.split('_');
+      const rndMap = {r32:'Ronda de 32',r16:'Octavos',qf:'Cuartos',sf:'Semifinal'};
+      roundLabel = rndMap[parts[0]] || parts[0].toUpperCase();
+      matchNum = parseInt(parts[1]) + 1;
+    }
+    bracketRows.push([roundLabel, matchNum, m.t1 ? getTeamName(m.t1) : '–', m.t2 ? getTeamName(m.t2) : '–', m.winner ? getTeamName(m.winner) : '–']);
   }
   const ws2 = XLSX.utils.aoa_to_sheet(bracketRows);
   ws2['!cols'] = [{wch:12},{wch:8},{wch:24},{wch:24},{wch:24}];
